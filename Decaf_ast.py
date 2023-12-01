@@ -4,8 +4,8 @@ from pydoc import classname
 #from sys import exception
 from symbol import typelist
 import ply.yacc as yacc
-import Decaf_parser as Parser
-from Decaf_parser import Node
+import decaf_parser as Parser
+from decaf_parser import Node
 import re
 import copy
 class AST:

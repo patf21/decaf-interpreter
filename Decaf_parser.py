@@ -1,5 +1,5 @@
 import sys
-from Decaf_lexer import *
+from decaf_lexer import *
 
 class Node:
     def __init__(self, type, children=None, leaf=None,lineNo = -1):
