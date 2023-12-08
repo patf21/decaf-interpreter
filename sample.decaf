@@ -1,0 +1,17 @@
+class Sample{
+  static int getX(){
+    int x;
+    float y;
+    int z;
+    z = 7;
+    x = 4 + 5;
+    y = x + 6;
+  }
+
+  static int getY(){
+    int x;
+    boolean y;
+    x = 4;
+    y = x < 5;
+  }
+}

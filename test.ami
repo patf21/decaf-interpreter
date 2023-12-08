@@ -1,0 +1,41 @@
+
+# method 1
+
+M_scan_int_1:
+
+# method 2
+
+M_scan_float_2:
+
+# method 3
+
+M_print_3:
+
+# method 4
+
+M_print_4:
+
+# method 5
+
+M_print_5:
+
+# method 6
+
+M_print_6:
+
+# method 7
+
+M_getX_7:
+move_immed_i t0, 7
+move_immed_i t1, 4
+move_immed_i t2, 5
+iadd t3, t1, t2
+itof t4, t3
+move_immed_i t5, 6
+itof t6, t5
+fadd t7, t4, t6
+
+# method 8
+
+M_getY_8:
+move_immed_i t8, 4
