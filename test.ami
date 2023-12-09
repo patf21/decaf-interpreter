@@ -26,16 +26,24 @@ M_print_6:
 # method 7
 
 M_getX_7:
-move_immed_i t0, 7
-move_immed_i t1, 4
-move_immed_i t2, 5
-iadd t3, t1, t2
-itof t4, t3
-move_immed_i t5, 6
-itof t6, t5
-fadd t7, t4, t6
+move_immed_i t0, 4
+move_immed_i t1, 5
+iadd t2, t0, t1
+itof t3, t2
+move_immed_i t4, 6
+itof t5, t4
+fadd t6, t3, t5
+move_immed_i t7, 10
+move_immed_i t8, 11
+iadd t9, t7, t8
+itof t10, t9
+move_immed_i t11, 7
+itof t12, t11
+fadd t13, t10, t12
 
 # method 8
 
 M_getY_8:
-move_immed_i t8, 4
+move_immed_i t14, 10
+move_immed_i t15, 11
+iadd t16, t14, t15

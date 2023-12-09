@@ -2,16 +2,19 @@ class Sample{
   static int getX(){
     int x;
     float y;
-    int z;
-    z = 7;
+    float z;
+    int k;
     x = 4 + 5;
     y = x + 6;
+    k = 10 + 11;
+    z = x + 7;
   }
 
   static int getY(){
     int x;
-    boolean y;
-    x = 4;
-    y = x < 5;
+    float y;
+    float z;
+    int k;
+    k = 10 + 11;
   }
 }

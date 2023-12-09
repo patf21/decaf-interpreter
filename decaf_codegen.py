@@ -75,6 +75,26 @@ def generate_binary_expression(value1, value2, reg1, reg2, operation, registers:
         result = value1 / value2
     elif operation == "imod" or operation == "fmod":
         result = value1 % value2
+    elif operation == "igt" or operation == "fgt": # >
+        if value1 > value2:
+            result = 1
+        else:
+            result = 0
+    elif operation == "igeq" or operation == "fgeq": # >=
+        if value1 >= value2:
+            result = 1
+        else:
+            result = 0
+    elif operation == "ilt" or operation == "flt": # <
+        if value1 < value2:
+            result = 1
+        else:
+            result = 0
+    elif operation == "ileq" or operation == "fleq": # <=
+        if value1 <= value2:
+            result = 1
+        else:
+            result = 0
     return output, result_reg, result
 
 def generate_binary_expression_type(expr_type, is_float=False):

@@ -37,6 +37,7 @@ class AST:
                           "t19", "t20", "t21", "t22", "t23", "t24", "t25", "t26", "t27",
                           "t28", "t29"]
         self.asm_stack = []
+        self.asm_varName = []
     def build(self, data):
         self.tree = data
     def remove_duplicates(self, array):
@@ -444,6 +445,7 @@ class AST:
                                             
                                                 varID+=1        
                                 print("Method Body:",end = "")
+                                self.asm_varName = [value[2] for value in varMap.values() if len(value) > 1]
                                 self.printBlock(temp2,varMap,classNode.children[0].leaf)
 
                         if didMethod == 0:
@@ -788,6 +790,7 @@ class AST:
         s = s[:-5]
         s = s.capitalize()
         return s
+    
     def printExpression(self,expression,varMap,recursive = 0):
         ## still print yet return "" so that it can be called in a print statement
         # print("printExpression expression: ", expression)
@@ -800,7 +803,7 @@ class AST:
                 # print("\n length of operationLst: ", len(self.operationLst))
                 if len(self.operationLst) == 0:
                     self.generate_binary_expression_helper(len(self.operationLst))
-            else:                        
+            else:                     
                 self.printAssign(expression.children[0],varMap)
         else:
             if len(expression.children) >1:
@@ -831,8 +834,6 @@ class AST:
                 else:
                     print(expression.type + "(",end = "")
                     self.printExpression(expression.children[0],varMap,recursive=1)
-    
-                
                 print (")",end = "")
         if recursive == 0:
             print(")",end = "")
@@ -983,6 +984,7 @@ class AST:
         print("\n ",self.typeLst)
         # print("\n", self.asm_registers)
         print("\n ", self.asm_data)
+        print("\n", self.asm_varName)
         if lengthOfOperation == 0: # case of 0 operation
             single_operand =  self.asm_stack[0]
             single_is_float = True if self.typeLst[1] == "float" else False
@@ -992,7 +994,7 @@ class AST:
             self.asm_stack.pop()
             if self.typeLst[0] != self.typeLst[1]: # float = int or int = float
                 des_register = self.asm_registers.pop(0)
-                # print(des_register)
+                # print(des_register) 
                 if self.typeLst[1] == "int": # float = int
                     output_code, result_value = generate_conversions(des_register, single_register, single_operand, "int")
                     self.asm += output_code
@@ -1002,15 +1004,18 @@ class AST:
                     self.asm += output_code
                     self.asm_data[des_register] = result_value
         elif lengthOfOperation == 1: # case of 1 operation
-            if len(self.asm_stack) == 1: # case of 1 value in the stack
+            if len(self.asm_stack) == 0: # case of 0 value in the stack
+                pass 
+            elif len(self.asm_stack) == 1: # case of 1 value in the stack
                 left_operand = self.asm_data[list(self.asm_data)[-1]]
                 right_operand = self.asm_stack[0]
                 left_is_float = isinstance(self.asm_data[list(self.asm_data)[-1]], float)
                 right_is_float = True if self.typeLst[2] == "float" else False
                 operation = ""
+                left_register = list(self.asm_data)[-1]
                 if self.operationLst[0] == "+" or self.operationLst[0] == "-" or self.operationLst[0] == "Mult" or self.operationLst[0] == "Divide":    
                     # case operation + - * /
-                    left_register = list(self.asm_data)[-1]
+                    # left_register = list(self.asm_data)[-1]
                     left_type = "float" if left_is_float else "int"
                     if self.typeLst[0] != left_type:
                         # float = int + int or int =  float + float
@@ -1051,33 +1056,38 @@ class AST:
                     result_output, result_register, result_value = generate_binary_expression(left_operand, right_operand, left_register, right_register, operation, self.asm_registers)
                     self.asm += result_output
                     self.asm_data[result_register] = result_value
+                    # self.asm_result_data[result_register] = result_value
                     self.asm_stack.pop()      
                 elif self.operationLst[0] == ">" or self.operationLst[0] == ">=" or self.operationLst[0] == "<" or self.operationLst[0] == "<=":
                     # case operation > >= < <=
-                    left_register = list(self.asm_data)[-1]
+                    # left_register = list(self.asm_data)[-1]
+                    # print("/n left_is_float: ", left_is_float)
                     if left_is_float or right_is_float:
                         operation = generate_binary_expression_type(self.operationLst[0], True)
                     else:
                         operation = generate_binary_expression_type(self.operationLst[0], False)
-                    if left_is_float != right_is_float and left_is_float == True:
+                    if left_is_float != right_is_float and left_is_float == False:
                         des_register = self.asm_registers.pop(0)
-                        if self.typeLst[1] == "int": # float = int
-                            output_code, result_value = generate_conversions(des_register, left_register, left_operand, "int")
-                            self.asm += output_code
-                            self.asm_data[des_register] = result_value
-                        elif self.typeLst[1] == "float": # int = float
-                            output_code, result_value = generate_conversions(des_register, left_register, left_operand, "float")
-                            self.asm += output_code
-                            self.asm_data[des_register] = result_value
-                        pass
+                        output_code, result_value = generate_conversions(des_register, left_register, left_operand, "int")
+                        self.asm += output_code
+                        self.asm_data[des_register] = result_value
+                        left_operand = result_value
+                        left_register = des_register
                     right_output, right_register = generate_literal(right_operand, self.asm_registers, right_is_float)
                     self.asm += right_output
                     self.asm_data[right_register] = right_operand
+                    if left_is_float != right_is_float and right_is_float == False:
+                        des_register = self.asm_registers.pop(0)
+                        output_code, result_value = generate_conversions(des_register, right_register, right_operand, "int")
+                        self.asm += output_code
+                        self.asm_data[des_register] = result_value
+                        right_operand = result_value
+                        right_register = des_register
                     result_output, result_register, result_value = generate_binary_expression(left_operand, right_operand, left_register, right_register, operation, self.asm_registers)
                     self.asm += result_output
                     self.asm_data[result_register] = result_value
-                    self.asm_stack.pop()      
-                    
+                    # self.asm_result_data[result_register] = result_value
+                    self.asm_stack.pop()    
             elif len(self.asm_stack) == 2: # case of 2 value in the stack
                 left_operand = self.asm_stack[0]
                 right_operand = self.asm_stack[1]
@@ -1130,10 +1140,40 @@ class AST:
                     result_output, result_register, result_value = generate_binary_expression(left_operand, right_operand, left_register, right_register, operation, self.asm_registers)
                     self.asm += result_output
                     self.asm_data[result_register] = result_value
+                    # self.asm_result_data[result_register] = result_value
                     self.asm_stack.pop()    
                     self.asm_stack.pop()        
                 elif self.operationLst[0] == ">" or self.operationLst[0] == ">=" or self.operationLst[0] == "<" or self.operationLst[0] == "<=":
-                    pass
+                    if left_is_float or right_is_float:
+                        operation = generate_binary_expression_type(self.operationLst[0], True)
+                    else:
+                        operation = generate_binary_expression_type(self.operationLst[0], False)
+                    left_output, left_register = generate_literal(left_operand, self.asm_registers, left_is_float)
+                    self.asm += left_output
+                    self.asm_data[left_register] = left_operand
+                    if left_is_float != right_is_float and left_is_float == False:
+                        des_register = self.asm_registers.pop(0)
+                        output_code, result_value = generate_conversions(des_register, left_register, left_operand, "int")
+                        self.asm += output_code
+                        self.asm_data[des_register] = result_value
+                        left_operand = result_value
+                        left_register = des_register
+                    right_output, right_register = generate_literal(right_operand, self.asm_registers, right_is_float)
+                    self.asm += right_output
+                    self.asm_data[right_register] = right_operand
+                    if left_is_float != right_is_float and right_is_float == False:
+                        des_register = self.asm_registers.pop(0)
+                        output_code, result_value = generate_conversions(des_register, right_register, right_operand, "int")
+                        self.asm += output_code
+                        self.asm_data[des_register] = result_value
+                        right_operand = result_value
+                        right_register = des_register
+                    result_output, result_register, result_value = generate_binary_expression(left_operand, right_operand, left_register, right_register, operation, self.asm_registers)
+                    self.asm += result_output
+                    self.asm_data[result_register] = result_value
+                    # self.asm_result_data[result_register] = result_value
+                    self.asm_stack.pop()    
+                    self.asm_stack.pop()
         elif lengthOfOperation > 1: # case of more than 1 operation
             pass
         return ""
@@ -1273,7 +1313,7 @@ class AST:
                     raise Exception(f"Type error at line {self.lineNo}, assigning boolean to nonboolean var")
                 for i in range(len(lst)):
                     if(lst[i]== "boolean" and i != 0):
-                        raise Exception(f"Type error at line {self.lineNo}, cannot operate boolean variables with numbers")
+                       raise Exception(f"Type error at line {self.lineNo}, cannot operate boolean variables with numbers")
                 if ">" not in self.operationLst and ">=" not in self.operationLst and"<" not in self.operationLst and "<=" not in self.operationLst and "==" not in self.operationLst and "!=" not in self.operationLst:
                     raise Exception(f"Type error at line {self.lineNo}, cannot assign numbers to boolean")
                 return "boolean"
