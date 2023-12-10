@@ -73,7 +73,9 @@ def main():
     ast = AST()
     ast.build(result)
     ast.print_tree(ast.tree)
-    write_asm("test.decaf", ast.asm)
+    write_asm("assembly_printout.txt", ast.asm)
+    print("\n\n\n" + ast.asm)
+    #print(ast.asm_data)
     # print(ast.tree)
     #print(result)
     # Parsing Successful

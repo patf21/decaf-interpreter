@@ -1,20 +1,16 @@
 class Sample{
   static int getX(){
-    int x;
-    float y;
-    float z;
-    int k;
-    x = 4 + 5;
-    y = x + 6;
-    k = 10 + 11;
-    z = x + 7;
+    int a;
+    int b;
+    b = 5;
+    a = -b;
   }
 
-  static int getY(){
+  /*static int getY(){
     int x;
     float y;
     float z;
     int k;
     k = 10 + 11;
-  }
+  }*/
 }

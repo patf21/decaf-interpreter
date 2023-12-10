@@ -32,12 +32,14 @@ class AST:
         self.creatingNewObject=0
         self.asm = ""
         self.asm_data = {}
-        self.asm_registers = ["t0","t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9",
-                          "t10", "t11", "t12", "t13", "t14", "t15", "t16", "t17", "t18",
-                          "t19", "t20", "t21", "t22", "t23", "t24", "t25", "t26", "t27",
-                          "t28", "t29"]
+        self.asm_registers = [("t" + str(i)) for i in range(50)]
         self.asm_stack = []
         self.asm_varName = []
+        self.isRhs= False
+        self.varToRegister= {}
+        self.lhsVar = -1
+        self.assigningLhs = False
+        self.uniqueLabelNum = 0
     def build(self, data):
         self.tree = data
     def remove_duplicates(self, array):
@@ -714,6 +716,10 @@ class AST:
                 #print(self.typeLst)
                 #print("\n\nHERE\n\n")
                 print("Variable("+str(varMap[item][0])+")",end = "")
+                if self.assigningLhs:
+                    self.lhsVar = varMap[item][0]
+                if self.isRhs:  
+                    self.asm_stack.append((varMap[item][0],"variable"+str(varMap[item][0])))
             else:
                 ## HERE WE DO ERROR TESTING
                 
@@ -726,6 +732,9 @@ class AST:
                         if field.children[0].leaf == self.oldMap[i][2] and (field.children[0].lineNo > self.oldMap[i][3].lineNo):
                             errFlag =0
                             print("Variable("+str(self.oldMap[i][0])+")",end = "")
+                            if self.isRhs:
+                                self.asm_stack.append((self.oldMap[i][0],"variable"+str(self.oldMap[i][0])))
+
                             self.typeLst.append(self.oldMap[i][1])
                             break
                     if errFlag:
@@ -791,7 +800,7 @@ class AST:
         s = s.capitalize()
         return s
     
-    def printExpression(self,expression,varMap,recursive = 0):
+    def printExpression(self,expression,varMap,recursive = 0,isOuterBinary = True):
         ## still print yet return "" so that it can be called in a print statement
         # print("printExpression expression: ", expression)
         # print("printExpression varMap: ", varMap)
@@ -802,31 +811,43 @@ class AST:
                 self.printPrimary(expression.children[0],varMap)
                 # print("\n length of operationLst: ", len(self.operationLst))
                 if len(self.operationLst) == 0:
+                    
                     self.generate_binary_expression_helper(len(self.operationLst))
             else:                     
                 self.printAssign(expression.children[0],varMap)
+                
         else:
+            self.isRhs = True
             if len(expression.children) >1:
                 print("Binary-Expression",end = "(")
+                
                 print(self.modify_string(expression.type),end = "")
                 self.operationLst.append(self.modify_string(expression.type))
                 print(", ",end = "")                
-                self.printExpression(expression.children[0],varMap,recursive=1)
+                self.printExpression(expression.children[0],varMap,recursive=1,isOuterBinary=False)
                 print( ", ",end = "")
-                self.printExpression(expression.children[1],varMap,recursive =1)
+                self.printExpression(expression.children[1],varMap,recursive =1,isOuterBinary=False)
+                self.isOuterBinary=True
                 print (")",end = "")
                 # print(self.typeLst)
                 # print(self.operationLst)
-                self.generate_binary_expression_helper(len(self.operationLst))
+                self.generate_binary_expression_helper(len(self.operationLst),isOuterBinary)
+
             else:
+
                 if(expression.type == "not_expr"):
+                    
                     print("UnaryExpression(!,",end = "")
-                    self.printExpression(expression.children[0],varMap,recursive=1)
                     self.operationLst.append("!")
+                    self.printExpression(expression.children[0],varMap,recursive=1)            
+                    self.generate_unary_expression_helper("!")
+                    
+                    
                 elif expression.type == "minus_expr":
                     print("UnaryExpression(-,",end = "")
                     self.operationLst.append("Unary-")
                     self.printExpression(expression.children[0],varMap,recursive=1)
+                    self.generate_unary_expression_helper("-")
                 elif expression.type == "pos_expr":
                     self.operationLst.append("+")
                     print("UnaryExpression(+,",end = "")
@@ -834,6 +855,7 @@ class AST:
                 else:
                     print(expression.type + "(",end = "")
                     self.printExpression(expression.children[0],varMap,recursive=1)
+                self.isRhs = False    
                 print (")",end = "")
         if recursive == 0:
             print(")",end = "")
@@ -878,7 +900,7 @@ class AST:
                 self.typeLst.append("null")
             print(primary.children[0].type + "(",end = "")
             print(primary.children[0].children[0],end = ")")
-            self.asm_stack.append(primary.children[0].children[0])
+            self.asm_stack.append((primary.children[0].children[0],"constant"))
             print(")",end = "")
         return ""
     def printMethod_invocation(self,primary,varMap):
@@ -977,20 +999,67 @@ class AST:
         print("]",end = "")
         self.creatingNewObject = 0
         self.methodNameRef = ""
+    def generate_unary_expression_helper(self, operation):
+        print(operation)
+        print(self.asm_stack)
+        single_is_float = True if len(self.typeLst) > 0 and self.typeLst[1] == "float" else False
+        single_operand =  self.asm_stack[0][0]
+        if single_operand == "true":
+            single_operand = 1
+        elif single_operand == "false":
+            single_operand = 0
+        single_output, single_register = generate_literal(single_operand, self.asm_registers, single_is_float)
+        self.asm += single_output
+        self.varToRegister[self.lhsVar] = single_register
+        self.asm_data[single_register] = single_operand
+        self.asm_stack.pop()
 
-    def generate_binary_expression_helper(self, lengthOfOperation):
-        print("\n ", self.operationLst)
-        print("\n ",self.asm_stack)
-        print("\n ",self.typeLst)
+        if operation == "-":
+            unary_output, result_reg, result = generate_unary("-", self.asm_registers,self.uniqueLabelNum)
+            self.asm += unary_output
+            self.asm_data[result_reg] = result
+        elif operation == "+":
+            # Unary plus is a no-op, so we don't need to generate any code
+            pass
+        elif operation == "!":
+            unary_output, result_reg, result = generate_unary("!", self.asm_registers,self.uniqueLabelNum)
+            self.asm += unary_output
+            self.asm_data[result_reg] = result
+        else:
+            raise ValueError(f"Unknown unary operator {operation}")
+        self.uniqueLabelNum +=1
+
+    def generate_binary_expression_helper(self, lengthOfOperation,isOuterBinary = True):
+       # print("\n ", self.operationLst)
+        #print("\n ",self.asm_stack)
+        #print("\n ",self.typeLst)
         # print("\n", self.asm_registers)
-        print("\n ", self.asm_data)
-        print("\n", self.asm_varName)
+        #print("\n ", self.asm_data)
+        #print("\n", self.asm_varName)
+
         if lengthOfOperation == 0: # case of 0 operation
-            single_operand =  self.asm_stack[0]
+            print(self.asm_stack)
+            varFlag = 0
+            single_operand =  self.asm_stack[0][0]
+            if self.asm_stack[0][1].startswith("variable"):
+                varFlag = 1
+                single_register = self.varToRegister[self.asm_stack[0][0]]
+                self.asm += f"move {self.asm_registers[0]}, {str(single_register)}"
+                self.asm_registers.pop(0)
+
             single_is_float = True if self.typeLst[1] == "float" else False
-            single_output, single_register = generate_literal(single_operand, self.asm_registers, single_is_float)
-            self.asm += single_output
+            
+            if single_operand == "true":
+                single_operand = 1
+            elif single_operand == "false":
+                single_operand = 0
+            if varFlag == 0:
+                single_output, single_register = generate_literal(single_operand, self.asm_registers, single_is_float)
+                self.asm += single_output
+            self.varToRegister[self.lhsVar] = single_register
+            
             self.asm_data[single_register] = single_operand
+
             self.asm_stack.pop()
             if self.typeLst[0] != self.typeLst[1]: # float = int or int = float
                 des_register = self.asm_registers.pop(0)
@@ -1004,93 +1073,15 @@ class AST:
                     self.asm += output_code
                     self.asm_data[des_register] = result_value
         elif lengthOfOperation == 1: # case of 1 operation
+            print(self.asm_stack)
             if len(self.asm_stack) == 0: # case of 0 value in the stack
                 pass 
             elif len(self.asm_stack) == 1: # case of 1 value in the stack
-                left_operand = self.asm_data[list(self.asm_data)[-1]]
-                right_operand = self.asm_stack[0]
-                left_is_float = isinstance(self.asm_data[list(self.asm_data)[-1]], float)
-                right_is_float = True if self.typeLst[2] == "float" else False
-                operation = ""
-                left_register = list(self.asm_data)[-1]
-                if self.operationLst[0] == "+" or self.operationLst[0] == "-" or self.operationLst[0] == "Mult" or self.operationLst[0] == "Divide":    
-                    # case operation + - * /
-                    # left_register = list(self.asm_data)[-1]
-                    left_type = "float" if left_is_float else "int"
-                    if self.typeLst[0] != left_type:
-                        # float = int + int or int =  float + float
-                        # convert left register
-                        des_register = self.asm_registers.pop(0)
-                        if self.typeLst[1] == "int": # float = int
-                            output_code, result_value = generate_conversions(des_register, left_register, left_operand, "int")
-                            self.asm += output_code
-                            self.asm_data[des_register] = result_value
-                        elif self.typeLst[1] == "float": # int = float
-                            output_code, result_value = generate_conversions(des_register, left_register, left_operand, "float")
-                            self.asm += output_code
-                            self.asm_data[des_register] = result_value
-                        left_register = des_register
-                        left_is_float = True if self.typeLst[0] == "float" else False
-                    if left_is_float:
-                        operation = generate_binary_expression_type(self.operationLst[0], True)
-                    else:
-                        operation = generate_binary_expression_type(self.operationLst[0], False)
-                    right_output, right_register = generate_literal(right_operand, self.asm_registers, right_is_float)
-                    self.asm += right_output
-                    self.asm_data[right_register] = right_operand
-                    if self.typeLst[0] != self.typeLst[2]:
-                        # float = int + int or int =  float + float
-                        # convert right register
-                        des_register = self.asm_registers.pop(0)
-                        if self.typeLst[2] == "int": # float = int
-                            output_code, result_value = generate_conversions(des_register, right_register, right_operand, "int")
-                            self.asm += output_code
-                            self.asm_data[des_register] = result_value
-                            right_operand = result_value
-                        elif self.typeLst[2] == "float": # int = float
-                            output_code, result_value = generate_conversions(des_register, right_register, right_operand, "float")
-                            self.asm += output_code
-                            self.asm_data[des_register] = result_value
-                            right_operand = result_value
-                        right_register = des_register
-                    result_output, result_register, result_value = generate_binary_expression(left_operand, right_operand, left_register, right_register, operation, self.asm_registers)
-                    self.asm += result_output
-                    self.asm_data[result_register] = result_value
-                    # self.asm_result_data[result_register] = result_value
-                    self.asm_stack.pop()      
-                elif self.operationLst[0] == ">" or self.operationLst[0] == ">=" or self.operationLst[0] == "<" or self.operationLst[0] == "<=":
-                    # case operation > >= < <=
-                    # left_register = list(self.asm_data)[-1]
-                    # print("/n left_is_float: ", left_is_float)
-                    if left_is_float or right_is_float:
-                        operation = generate_binary_expression_type(self.operationLst[0], True)
-                    else:
-                        operation = generate_binary_expression_type(self.operationLst[0], False)
-                    if left_is_float != right_is_float and left_is_float == False:
-                        des_register = self.asm_registers.pop(0)
-                        output_code, result_value = generate_conversions(des_register, left_register, left_operand, "int")
-                        self.asm += output_code
-                        self.asm_data[des_register] = result_value
-                        left_operand = result_value
-                        left_register = des_register
-                    right_output, right_register = generate_literal(right_operand, self.asm_registers, right_is_float)
-                    self.asm += right_output
-                    self.asm_data[right_register] = right_operand
-                    if left_is_float != right_is_float and right_is_float == False:
-                        des_register = self.asm_registers.pop(0)
-                        output_code, result_value = generate_conversions(des_register, right_register, right_operand, "int")
-                        self.asm += output_code
-                        self.asm_data[des_register] = result_value
-                        right_operand = result_value
-                        right_register = des_register
-                    result_output, result_register, result_value = generate_binary_expression(left_operand, right_operand, left_register, right_register, operation, self.asm_registers)
-                    self.asm += result_output
-                    self.asm_data[result_register] = result_value
-                    # self.asm_result_data[result_register] = result_value
-                    self.asm_stack.pop()    
+                pass
             elif len(self.asm_stack) == 2: # case of 2 value in the stack
-                left_operand = self.asm_stack[0]
-                right_operand = self.asm_stack[1]
+                left_operand = self.asm_stack[0][0]
+                
+                right_operand = self.asm_stack[1][0]
                 left_is_float = True if self.typeLst[1] == "float" else False
                 right_is_float = True if self.typeLst[2] == "float" else False
                 operation = ""
@@ -1101,8 +1092,15 @@ class AST:
                         operation = generate_binary_expression_type(self.operationLst[0], True)
                     else:
                         operation = generate_binary_expression_type(self.operationLst[0], False)
-                    left_output, left_register = generate_literal(left_operand, self.asm_registers, left_is_float)
-                    self.asm += left_output
+                    if (self.asm_stack[0][1] == "constant"):
+                        left_output, left_register = generate_literal(left_operand, self.asm_registers, left_is_float)
+                        
+                        self.asm += left_output
+                    elif self.asm_stack[0][1].startswith("variable"):
+                        s = self.asm_stack[0][1]
+                        start = s.find("variable") + len("variable")
+                        substring = s[start:]
+                        left_register = self.varToRegister[int(substring)]
                     self.asm_data[left_register] = left_operand
                     if self.typeLst[0] != self.typeLst[1]:
                         # float = int + int or int =  float + float
@@ -1119,9 +1117,17 @@ class AST:
                             self.asm_data[des_register] = result_value
                             left_operand = result_value
                         left_register = des_register
-                    right_output, right_register = generate_literal(right_operand, self.asm_registers, right_is_float)
-                    self.asm += right_output
+                    if (self.asm_stack[1][1] == "constant"):
+                        
+                        right_output, right_register = generate_literal(right_operand, self.asm_registers, right_is_float)
+                        self.asm += right_output
+                    elif self.asm_stack[1][1].startswith("variable"):
+                        s = self.asm_stack[1][1]
+                        start = s.find("variable") + len("variable")
+                        substring = s[start:]
+                        right_register = self.varToRegister[int(substring)]
                     self.asm_data[right_register] = right_operand
+
                     if self.typeLst[0] != self.typeLst[2]:
                         # float = int + int or int =  float + float
                         # convert right register
@@ -1137,19 +1143,33 @@ class AST:
                             self.asm_data[des_register] = result_value
                             right_operand = result_value
                         right_register = des_register
-                    result_output, result_register, result_value = generate_binary_expression(left_operand, right_operand, left_register, right_register, operation, self.asm_registers)
+                    result_output, result_register, result_value = generate_binary_expression(left_operand, right_operand, left_register, right_register, operation, self.asm_registers,self.uniqueLabelNum)
+                    self.uniqueLabelNum +=1 
                     self.asm += result_output
                     self.asm_data[result_register] = result_value
+                    if isOuterBinary == True:
+                        self.varToRegister[self.lhsVar] = result_register
                     # self.asm_result_data[result_register] = result_value
                     self.asm_stack.pop()    
                     self.asm_stack.pop()        
-                elif self.operationLst[0] == ">" or self.operationLst[0] == ">=" or self.operationLst[0] == "<" or self.operationLst[0] == "<=":
+                elif self.operationLst[0] in [">", ">=", "<", "<=","&&", "!=", "==", "||", ]:
+                    
                     if left_is_float or right_is_float:
                         operation = generate_binary_expression_type(self.operationLst[0], True)
                     else:
                         operation = generate_binary_expression_type(self.operationLst[0], False)
-                    left_output, left_register = generate_literal(left_operand, self.asm_registers, left_is_float)
-                    self.asm += left_output
+                    if (self.asm_stack[0][1] == "constant"):
+                        if left_operand == "false":
+                            left_operand = 0
+                        elif left_operand == "true":
+                            left_operand = 1
+                        left_output, left_register = generate_literal(left_operand, self.asm_registers, left_is_float)
+                        self.asm += left_output
+                    elif self.asm_stack[0][1].startswith("variable"):
+                        s = self.asm_stack[0][1]
+                        start = s.find("variable") + len("variable")
+                        substring = s[start:]
+                        left_register = self.varToRegister[int(substring)]
                     self.asm_data[left_register] = left_operand
                     if left_is_float != right_is_float and left_is_float == False:
                         des_register = self.asm_registers.pop(0)
@@ -1158,8 +1178,19 @@ class AST:
                         self.asm_data[des_register] = result_value
                         left_operand = result_value
                         left_register = des_register
-                    right_output, right_register = generate_literal(right_operand, self.asm_registers, right_is_float)
-                    self.asm += right_output
+
+                    if (self.asm_stack[1][1] == "constant"):
+                        if right_operand == "false":
+                            right_operand = 0
+                        elif right_operand == "true":
+                            right_operand = 1
+                        right_output, right_register = generate_literal(right_operand, self.asm_registers, right_is_float)
+                        self.asm += right_output
+                    elif self.asm_stack[1][1].startswith("variable"):
+                        s = self.asm_stack[1][1]
+                        start = s.find("variable") + len("variable")
+                        substring = s[start:]
+                        right_register = self.varToRegister[int(substring)]
                     self.asm_data[right_register] = right_operand
                     if left_is_float != right_is_float and right_is_float == False:
                         des_register = self.asm_registers.pop(0)
@@ -1168,13 +1199,17 @@ class AST:
                         self.asm_data[des_register] = result_value
                         right_operand = result_value
                         right_register = des_register
-                    result_output, result_register, result_value = generate_binary_expression(left_operand, right_operand, left_register, right_register, operation, self.asm_registers)
+                    result_output, result_register, result_value = generate_binary_expression(left_operand, right_operand, left_register, right_register, operation, self.asm_registers,self.uniqueLabelNum)
+                    self.uniqueLabelNum +=1 
                     self.asm += result_output
+                    if isOuterBinary == True:                 
+                        self.varToRegister[self.lhsVar] = result_register
                     self.asm_data[result_register] = result_value
                     # self.asm_result_data[result_register] = result_value
                     self.asm_stack.pop()    
                     self.asm_stack.pop()
         elif lengthOfOperation > 1: # case of more than 1 operation
+            
             pass
         return ""
     
@@ -1183,9 +1218,13 @@ class AST:
                 if descend.type == "assign_expr":
                     
                     print("assign(", end = "")
+                    self.isRhs = False
+                    self.assigningLhs = True
                     self.printLHS(descend.children[0],newVarMap)
-                    
+                    self.assigningLhs = False
                     print(", ", end = "")
+                    self.isRhs = True
+                    #test this one out
                     self.printExpression(descend.children[1],newVarMap,recursive=1)
                     self.AssignLst.append(self.typeLst)
                     self.AssignLst=self.flatten(self.AssignLst)

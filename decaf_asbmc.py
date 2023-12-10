@@ -8,7 +8,7 @@ def write_asm(filename, asm):
   filename = filename.split("/")[-1]
   # remove .decaf extension
   filename = filename.split(".")[0]
-  filename += ".ami"
+  filename += ".txt"
   with open(filename, "w") as f:
     f.write(asm)
     f.close()
