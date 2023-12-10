@@ -79,7 +79,7 @@ def generate_unary(op, registers,labelNum):
     result = 0
 
     if op == '!':
-        output = f"bz {result_reg}, end{labelNum}\nmove_immed_i {result_reg}, 1\nend{labelNum}:"
+        output = f"bz {result_reg}, end{labelNum}\nmove_immed_i {result_reg}, 1\nend{labelNum}:\n"
         result = 1 if result_reg == 0 else 0
     elif op == '-':
         output = f"move_immed_i r0, 0\nisub {result_reg}, r0, {result_reg}"
